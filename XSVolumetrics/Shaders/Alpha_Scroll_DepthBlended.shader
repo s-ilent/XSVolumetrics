@@ -34,6 +34,22 @@
 				float3 normal : NORMAL;
 			};
 
+			// Dj Lukis LT's method for retrieving linear depth that's correct in mirrors.
+			// https://github.com/lukis101/VRCUnityStuffs
+			#define PM UNITY_MATRIX_P
+			inline float4 CalculateObliqueFrustumCorrection()
+			{
+				float x1 = -PM._31/(PM._11*PM._34);
+				float x2 = -PM._32/(PM._22*PM._34);
+				return float4(x1, x2, 0, PM._33/PM._34 + x1*PM._13 + x2*PM._23);
+			}
+			static float4 ObliqueFrustumCorrection = CalculateObliqueFrustumCorrection();
+			inline float CorrectedLinearEyeDepth(float z, float B)
+			{
+				return 1.0 / (z/PM._34 + B);
+			}
+			#undef PM
+
 			struct v2f
 			{
 				float2 uv : TEXCOORD0;
@@ -42,7 +58,7 @@
 				float3 normal : TEXCOORD2;
 				float3 worldNormal : TEXCOORD3;
 				float4 worldPos : TEXCOORD4;
-				float3 viewDir : TEXCOORD5;
+				float4 viewDir : TEXCOORD5;
 				float4 screenPos : TEXCOORD6;
 			};
 
@@ -60,7 +76,8 @@
 				o.worldPos = mul(unity_ObjectToWorld, v.vertex);
 				o.screenPos = ComputeScreenPos (o.vertex);
 				COMPUTE_EYEDEPTH(o.screenPos.z);
-				o.viewDir = ObjSpaceViewDir(v.vertex);
+				o.viewDir.xyz = ObjSpaceViewDir(v.vertex);
+				o.viewDir.w = dot(o.vertex, ObliqueFrustumCorrection); // Oblique frustrum correction factor
 				UNITY_TRANSFER_FOG(o,o.vertex);
 				return o;
 			}
@@ -68,7 +85,8 @@
 			fixed4 frag (v2f i) : SV_Target
 			{
 				float fadeAmt = 1-(_FadeAmt);
-				float sceneZ = LinearEyeDepth (SAMPLE_DEPTH_TEXTURE_PROJ(_CameraDepthTexture, UNITY_PROJ_COORD(i.screenPos)));
+				float sceneZ = CorrectedLinearEyeDepth (SAMPLE_DEPTH_TEXTURE_PROJ(_CameraDepthTexture, 
+					UNITY_PROJ_COORD(i.screenPos)), (i.viewDir.w/i.screenPos.w));
 				float partZ = i.screenPos.z;
 				float depthFade = saturate(fadeAmt * (sceneZ-partZ));
 

@@ -1,19 +1,21 @@
-﻿Shader "Xiexe/Additive_GodRay"
+﻿Shader "Xiexe/Additive_GodRay (Smoky)"
 {
 	Properties
 	{
 		_MainTex ("Texture", 2D) = "white" {}
+		_NoiseTex ("Scrolling Noise", 2D) = "white" {}
 		[Space]
 		[HDR]_Color("Color Tint", Color) = (1,1,1,1)
-		[ToggleUI]_UseSunColour("Use Sun Colour", Float) = 1.0
+		[ToggleUI]_UseSunColour("Use Sun Colour", Float) = 0.0
 		[Space]
-		_PulseSpeed("Pulse Speed", Range(0,2)) = 0
+		//_PulseSpeed("Pulse Speed", Range(0,2)) = 0
 		_FadeStrength("Edge Fade", Range(1,5)) = 1
 		_DistFade("Distance Fade", Range(0,1)) = 0.7
 		[Space]
 		_FadeAmt("Depth Blending", Range(0, 1)) = 0.1
 		_FadePow("Depth Blending Power", Range(0, 10)) = 1
 		[Space]
+		_SmokeScroll("Smoke Scroll Speed", Vector ) = (0, 0, 0, 1)
 		[Enum(UnityEngine.Rendering.CullMode)] _CullMode("Cull Mode", Float) = 0
 	}
 	SubShader
@@ -78,11 +80,12 @@
     			UNITY_VERTEX_OUTPUT_STEREO
 			};
 
-			sampler2D _MainTex, _CameraDepthTexture;
-			float4 _MainTex_ST, _Color;
+			sampler2D _MainTex, _NoiseTex, _CameraDepthTexture;
+			float4 _MainTex_ST, _NoiseTex_ST, _Color;
 			float _UseSunColour;
 			float _PulseSpeed;
 			float _FadeStrength, _FadeAmt, _DistFade, _FadePow;
+			float4 _SmokeScroll;
 			
 			v2f vert (appdata v)
 			{
@@ -134,7 +137,11 @@
 
 				float2 uv = i.uv.xy; 
 				fixed4 col = tex2D(_MainTex, uv);
-				col *= ((sin(_Time.y * _PulseSpeed) * 0.5 + 1));
+				col *= (
+					tex2D(_NoiseTex, i.worldPos.xy*_NoiseTex_ST.xy + _Time.y*_SmokeScroll.xy*_SmokeScroll.w).r +
+					tex2D(_NoiseTex, i.worldPos.zy*_NoiseTex_ST.xy + _Time.y*_SmokeScroll.zy*_SmokeScroll.w).g +
+					tex2D(_NoiseTex, i.worldPos.xz*_NoiseTex_ST.xy + _Time.y*_SmokeScroll.xz*_SmokeScroll.w).b ) / 3.0;
+				// col *= ((sin(_Time.y * _PulseSpeed) * 0.5 + 1));
 				col *= i.color;
 				col *= col.a;
 				col *= fade;
